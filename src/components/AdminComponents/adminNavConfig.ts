@@ -10,6 +10,7 @@ import {
   ImageUp,
   ChartNoAxesCombined,
   Settings,
+  Group
 } from "lucide-react";
 
 import { FaUsers } from "react-icons/fa";
@@ -59,6 +60,7 @@ export const adminNavItems: NavItem[] = [
         icon: PackageSearch,
       },
       { id: "categories", label: "Categories", href: "/categories", icon: MdOutlineCategory },
+      { id: "collections", label: "Collections", href: "/collection", icon: Group },
     ],
     icon: Warehouse,
   },

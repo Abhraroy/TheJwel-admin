@@ -8,6 +8,71 @@ import {
 } from "@/app/utils/cloudflare";
 import { extractR2KeyFromUrl } from ".";
 
+const PRODUCT_SELECT = `
+  *,
+  categories(*),
+  product_images(*),
+  sub_categories(*),
+  product_collections (
+    collection_id,
+    collections (collection_id, collection_name, slug, is_active)
+  )
+`;
+
+function normalizeProductCollections(product: Record<string, unknown>) {
+  const productCollections = product.product_collections;
+  if (!Array.isArray(productCollections)) {
+    return product;
+  }
+
+  return {
+    ...product,
+    product_collections: productCollections.map(
+      (pc: {
+        collection_id: string;
+        collections:
+          | { collection_id: string; collection_name: string; slug: string | null; is_active: boolean }
+          | { collection_id: string; collection_name: string; slug: string | null; is_active: boolean }[]
+          | null;
+      }) => ({
+        collection_id: pc.collection_id,
+        collections: Array.isArray(pc.collections) ? pc.collections[0] ?? null : pc.collections,
+      }),
+    ),
+  };
+}
+
+async function syncProductCollections(productId: string, collectionIds: string[]) {
+  const { error: deleteError } = await supabase
+    .from("product_collections")
+    .delete()
+    .eq("product_id", productId);
+
+  if (deleteError) {
+    return { success: false, error: deleteError.message };
+  }
+
+  const uniqueIds = [...new Set(collectionIds.filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return { success: true };
+  }
+
+  const rows = uniqueIds.map((collection_id) => ({
+    product_id: productId,
+    collection_id,
+  }));
+
+  const { error: insertError } = await supabase
+    .from("product_collections")
+    .insert(rows);
+
+  if (insertError) {
+    return { success: false, error: insertError.message };
+  }
+
+  return { success: true };
+}
+
 export async function uploadProductImages(productId: string, files: File[]) {
   try {
     if (files.length === 0) {
@@ -70,21 +135,24 @@ export async function saveProductImageUrls(productId: string, imageUrls: string[
 export async function getProducts() {
   const { data, error } = await supabase
     .from("products")
-    .select("*,categories(*),product_images(*),sub_categories(*)")
+    .select(PRODUCT_SELECT)
     // Stable deterministic ordering prevents rows with identical created_at from shifting between pages after updates
     .order("created_at", { ascending: false })
     .order("product_id", { ascending: false });
   if (error) {
     console.log("error", error);
     return { success: false, data: null, message: error.message };
-  } else {
-    console.log("products", data);
-    return {
-      success: true,
-      data: data,
-      message: "Products fetched successfully",
-    };
   }
+
+  const normalized = (data ?? []).map((product) =>
+    normalizeProductCollections(product as Record<string, unknown>),
+  );
+
+  return {
+    success: true,
+    data: normalized,
+    message: "Products fetched successfully",
+  };
 }
 
 // export async function createProduct(productData: any) {
@@ -179,7 +247,7 @@ export async function createProduct(productData: any) {
       size: productData.size || [],
       tags: productData.tags || [],
       occasion: productData.occasion || "",
-      collection: productData.collection || "",
+      style: productData.style || "",
       listed_status:
         typeof productData.listed_status === "boolean"
           ? productData.listed_status
@@ -203,8 +271,17 @@ export async function createProduct(productData: any) {
 
     if (error) throw error;
 
+    const syncResult = await syncProductCollections(
+      data.product_id,
+      productData.collection_ids ?? [],
+    );
+    if (!syncResult.success) {
+      return { success: false, error: syncResult.error ?? "Failed to link collections" };
+    }
+
     // Ensure admin products list reflects the new row in production (RSC cache)
     revalidatePath("/products");
+    revalidatePath("/collection");
     revalidatePath("/");
     return { success: true, data };
   } catch (error: any) {
@@ -269,7 +346,7 @@ export async function updateProduct(productId: string, productData: any) {
       size: productData.size || [],
       tags: productData.tags || [],
       occasion: productData.occasion || "",
-      collection: productData.collection || "",
+      style: productData.style || "",
       listed_status:
         typeof productData.listed_status === "boolean"
           ? productData.listed_status
@@ -290,8 +367,17 @@ export async function updateProduct(productId: string, productData: any) {
       return { success: false, error: updateError.message };
     }
 
+    const syncResult = await syncProductCollections(
+      productId,
+      productData.collection_ids ?? [],
+    );
+    if (!syncResult.success) {
+      return { success: false, error: syncResult.error ?? "Failed to link collections" };
+    }
+
     // Invalidate cached admin pages so router.refresh() picks up latest data in production.
     revalidatePath("/products");
+    revalidatePath("/collection");
     revalidatePath(`/${productId}`);
     revalidatePath("/");
     return { success: true, data: updatedData };

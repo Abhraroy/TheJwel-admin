@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import useAdminStore from "@/zustandStore/AdminZustandStore";
+import { getStyleLabel } from "@/lib/product-style";
 
 interface ProductCatalogueListProps {
   products: any[];
@@ -24,6 +25,7 @@ export default function ProductCatalogueList({ products }: ProductCatalogueListP
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [subcategoryFilter, setSubcategoryFilter] = useState("");
+  const [styleFilter, setStyleFilter] = useState("");
   const [collectionFilter, setCollectionFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -52,13 +54,31 @@ export default function ProductCatalogueList({ products }: ProductCatalogueListP
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [products]);
 
-  const uniqueCollections = useMemo(() => {
+  const uniqueStyles = useMemo(() => {
     const set = new Set<string>();
     products.forEach((p) => {
-      const col = (p?.collection ?? "").trim();
-      if (col) set.add(col);
+      const style = (p?.style ?? p?.collection ?? "").trim();
+      if (style) set.add(style);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
+  const uniqueCollections = useMemo(() => {
+    const map = new Map<string, string>();
+    products.forEach((p) => {
+      const productCollections = Array.isArray(p?.product_collections)
+        ? p.product_collections
+        : [];
+      productCollections.forEach((pc: { collection_id?: string; collections?: { collection_id?: string; collection_name?: string } | null }) => {
+        const collection = pc?.collections;
+        if (collection?.collection_id && collection?.collection_name) {
+          map.set(collection.collection_id, collection.collection_name);
+        } else if (pc?.collection_id) {
+          map.set(pc.collection_id, pc.collection_id);
+        }
+      });
+    });
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -70,14 +90,27 @@ export default function ProductCatalogueList({ products }: ProductCatalogueListP
       const matchesCategory = !categoryFilter || p?.category_id === categoryFilter;
       const matchesSubcategory =
         !subcategoryFilter || p?.subcategory_id === subcategoryFilter;
+      const productStyle = (p?.style ?? p?.collection ?? "").trim();
+      const matchesStyle = !styleFilter || productStyle === styleFilter;
+      const productCollectionIds = Array.isArray(p?.product_collections)
+        ? p.product_collections
+            .map((pc: { collection_id?: string }) => pc.collection_id)
+            .filter(Boolean)
+        : [];
       const matchesCollection =
-        !collectionFilter || (p?.collection ?? "").trim() === collectionFilter;
-      return matchesSearch && matchesCategory && matchesSubcategory && matchesCollection;
+        !collectionFilter || productCollectionIds.includes(collectionFilter);
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesSubcategory &&
+        matchesStyle &&
+        matchesCollection
+      );
     });
-  }, [products, normalizedQuery, categoryFilter, subcategoryFilter, collectionFilter]);
+  }, [products, normalizedQuery, categoryFilter, subcategoryFilter, styleFilter, collectionFilter]);
 
   const hasActiveFilters =
-    Boolean(categoryFilter || subcategoryFilter || collectionFilter);
+    Boolean(categoryFilter || subcategoryFilter || styleFilter || collectionFilter);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -107,6 +140,7 @@ export default function ProductCatalogueList({ products }: ProductCatalogueListP
   const clearFilters = () => {
     setCategoryFilter("");
     setSubcategoryFilter("");
+    setStyleFilter("");
     setCollectionFilter("");
   };
 
@@ -169,14 +203,26 @@ export default function ProductCatalogueList({ products }: ProductCatalogueListP
                   ))}
                 </select>
                 <select
+                  value={styleFilter}
+                  onChange={(e) => setStyleFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#E94E8B]"
+                >
+                  <option value="">All Styles</option>
+                  {uniqueStyles.map((style) => (
+                    <option key={style} value={style}>
+                      {getStyleLabel(style)}
+                    </option>
+                  ))}
+                </select>
+                <select
                   value={collectionFilter}
                   onChange={(e) => setCollectionFilter(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#E94E8B]"
                 >
                   <option value="">All Collections</option>
-                  {uniqueCollections.map((col) => (
-                    <option key={col} value={col}>
-                      {col}
+                  {uniqueCollections.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
                     </option>
                   ))}
                 </select>
