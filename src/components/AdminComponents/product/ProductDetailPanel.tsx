@@ -14,6 +14,11 @@ import {
 } from "@/app/(admin)/actions/Product";
 import { getCategories, getSubCategories } from "@/app/(admin)/actions/categories";
 import { ADMIN_SELECTABLE_TAGS } from "@/lib/product-tags";
+import { PRODUCT_STYLES, normalizeStyle } from "@/lib/product-style";
+import {
+  getActiveCollectionsForSelect,
+  type CollectionSelectOption,
+} from "@/app/(admin)/collection/action";
 
 const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
 
@@ -35,19 +40,18 @@ type FormData = {
   size: string[];
   tags: string[];
   occasion: string;
-  collection: string;
+  style: string;
+  collection_ids: string[];
   listed_status: boolean;
   home_visibility: boolean;
 };
 
-function normalizeCollection(value: unknown): string {
-  const raw = (value ?? "").toString().trim().toLowerCase();
-  if (raw === "american-diamond" || raw === "american diamond") return "american-diamond";
-  if (raw === "temple-jewellery" || raw === "temple jewellery" || raw === "temple") {
-    return "temple-jewellery";
-  }
-  if (raw === "anti-tarnish" || raw === "anti tarnish") return "anti-tarnish";
-  return "american-diamond";
+function getProductCollectionIds(product: any): string[] {
+  if (!Array.isArray(product?.product_collections)) return [];
+  return product.product_collections
+    .map((pc: { collection_id?: string }) => pc.collection_id)
+    .filter(Boolean)
+    .map(String);
 }
 
 function calculateDiscountPercentage(base: number, final: number): number {
@@ -86,7 +90,8 @@ function buildFormFromProduct(product: any): FormData {
     size: safeArray(product.size),
     tags: safeArray(product.tags),
     occasion: product.occasion ?? "",
-    collection: normalizeCollection(product.collection),
+    style: normalizeStyle(product.style ?? product.collection),
+    collection_ids: getProductCollectionIds(product),
     listed_status: product.listed_status ?? true,
     home_visibility: product.home_visibility ?? true,
   };
@@ -132,11 +137,13 @@ function formsEqual(a: FormData, b: FormData): boolean {
     a.stock_quantity === b.stock_quantity &&
     a.weight_grams === b.weight_grams &&
     a.occasion === b.occasion &&
-    a.collection === b.collection &&
+    a.style === b.style &&
     a.listed_status === b.listed_status &&
     a.home_visibility === b.home_visibility &&
     JSON.stringify(a.size) === JSON.stringify(b.size) &&
-    JSON.stringify(a.tags) === JSON.stringify(b.tags)
+    JSON.stringify(a.tags) === JSON.stringify(b.tags) &&
+    JSON.stringify([...a.collection_ids].sort()) ===
+      JSON.stringify([...b.collection_ids].sort())
   );
 }
 
@@ -158,12 +165,14 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
     size: [],
     tags: [],
     occasion: "",
-    collection: "american-diamond",
+    style: "american-diamond",
+    collection_ids: [],
     listed_status: true,
     home_visibility: true,
   });
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [subCategoriesList, setSubCategoriesList] = useState<any[]>([]);
+  const [collectionsList, setCollectionsList] = useState<CollectionSelectOption[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -202,6 +211,16 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
       }
     };
     fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    const fetchCollections = async () => {
+      const result = await getActiveCollectionsForSelect();
+      if (result.success && result.data) {
+        setCollectionsList(result.data);
+      }
+    };
+    fetchCollections();
   }, []);
 
   const resetForm = useCallback(
@@ -289,7 +308,8 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
     size: formData.size,
     tags: formData.tags,
     occasion: formData.occasion,
-    collection: formData.collection,
+    style: formData.style,
+    collection_ids: formData.collection_ids,
     listed_status: formData.listed_status,
     home_visibility: formData.home_visibility,
     thumbnail_image: selectedProduct.thumbnail_image ?? null,
@@ -897,18 +917,57 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Collection</label>
+                <label className={labelClass}>Style</label>
                 <select
-                  value={formData.collection}
+                  value={formData.style}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, collection: e.target.value }))
+                    setFormData((prev) => ({ ...prev, style: e.target.value }))
                   }
                   className={inputClass}
                 >
-                  <option value="american-diamond">American Diamond</option>
-                  <option value="temple-jewellery">Temple Jewellery</option>
-                  <option value="anti-tarnish">Anti Tarnish</option>
+                  {PRODUCT_STYLES.map((style) => (
+                    <option key={style.slug} value={style.slug}>
+                      {style.label}
+                    </option>
+                  ))}
                 </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Collections</label>
+                {collectionsList.length === 0 ? (
+                  <p className="text-sm text-gray-500">No active collections available.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {collectionsList.map((collection) => {
+                      const isSelected = formData.collection_ids.includes(
+                        collection.collection_id,
+                      );
+                      return (
+                        <button
+                          key={collection.collection_id}
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              collection_ids: isSelected
+                                ? prev.collection_ids.filter(
+                                    (id) => id !== collection.collection_id,
+                                  )
+                                : [...prev.collection_ids, collection.collection_id],
+                            }));
+                          }}
+                          className={`px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                            isSelected
+                              ? "bg-[#E94E8B] border-[#E94E8B] text-white"
+                              : "bg-white border-gray-300 text-gray-900 hover:bg-gray-50"
+                          }`}
+                        >
+                          {collection.collection_name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div>
                 <label className={labelClass}>Size</label>

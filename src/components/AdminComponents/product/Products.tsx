@@ -9,6 +9,11 @@ import { useRouter } from "next/navigation";
 import useAdminStore from "../../../zustandStore/AdminZustandStore";
 import OptimizedImage from "@/components/OptimizedImage";
 import { ADMIN_SELECTABLE_TAGS } from "@/lib/product-tags";
+import { PRODUCT_STYLES, normalizeStyle } from "@/lib/product-style";
+import {
+  getActiveCollectionsForSelect,
+  type CollectionSelectOption,
+} from "@/app/(admin)/collection/action";
 
 const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB guard to keep server action body small
 
@@ -41,26 +46,7 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
   const editingProduct = product ?? storeEditingProduct;
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [subCategoriesList, setSubCategoriesList] = useState<any[]>([]);
-
-  const normalizeCollection = (value: any): string => {
-    const raw = (value ?? "").toString().trim().toLowerCase();
-
-    // Keep the stored values consistent with what the app routes/filters on.
-    if (raw === "american-diamond" || raw === "american diamond") return "american-diamond";
-    if (
-      raw === "temple-jewellery" ||
-      raw === "temple jewellery" ||
-      raw === "temple"
-    ) {
-      return "temple-jewellery";
-    }
-    if (raw === "anti-tarnish" || raw === "anti tarnish") {
-      return "anti-tarnish";
-    }
-
-    // Fallback to a valid option so the dropdown always has a selected value.
-    return "american-diamond";
-  };
+  const [collectionsList, setCollectionsList] = useState<CollectionSelectOption[]>([]);
 
   // Allow empty string for numeric inputs so placeholder can show (instead of a leading 0).
   type NumericInput = number | "";
@@ -79,7 +65,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
     size: [] as string[],
     tags: [] as string[],
     occasion: "" as string,
-    collection: "american-diamond" as string,
+    style: "american-diamond" as string,
+    collection_ids: [] as string[],
     listed_status: true as boolean,
     home_visibility: true as boolean,
   });
@@ -101,6 +88,18 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    const fetchCollections = async () => {
+      const result = await getActiveCollectionsForSelect();
+      if (result.success && result.data) {
+        setCollectionsList(result.data);
+      } else {
+        console.error("Failed to fetch collections:", result.error);
+      }
+    };
+    fetchCollections();
+  }, []);
+
   // Initialize form when product prop changes (for editing)
   useEffect(() => {
     if (editingProduct) {
@@ -111,6 +110,14 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
         return Number.isFinite(n) ? n : fallback;
       };
       const safeArray = (v: any): string[] => (Array.isArray(v) ? v.filter(Boolean).map(String) : []);
+
+      const safeCollectionIds = (v: any): string[] =>
+        Array.isArray(v)
+          ? v
+              .map((pc) => (typeof pc === "string" ? pc : pc?.collection_id))
+              .filter(Boolean)
+              .map(String)
+          : [];
 
       setFormData({
         product_name: safeString(editingProduct.product_name),
@@ -127,7 +134,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
         size: safeArray(editingProduct.size),
         tags: safeArray(editingProduct.tags),
         occasion: safeString(editingProduct.occasion),
-        collection: normalizeCollection(editingProduct.collection),
+        style: normalizeStyle(editingProduct.style ?? editingProduct.collection),
+        collection_ids: safeCollectionIds(editingProduct.product_collections),
         listed_status: editingProduct.listed_status ?? true,
         home_visibility: editingProduct.home_visibility ?? true,
       });
@@ -157,7 +165,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
         size: [],
         tags: [],
         occasion: "",
-        collection: "american-diamond",
+        style: "american-diamond",
+        collection_ids: [],
         listed_status: true,
         home_visibility: true,
       });
@@ -364,7 +373,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
       size: [],
       tags: [],
       occasion: "",
-      collection: "american-diamond",
+      style: "american-diamond",
+      collection_ids: [],
       listed_status: true,
       home_visibility: true,
     });
@@ -823,11 +833,11 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
                       isDarkTheme ? "text-gray-300" : "text-gray-700"
                     }`}
                   >
-                    Collection
+                    Style
                   </label>
                   <select
-                    name="collection"
-                    value={formData.collection}
+                    name="style"
+                    value={formData.style}
                     onChange={handleInputChange}
                     className={`w-full px-4 py-2 rounded-lg border transition-colors ${
                       isDarkTheme
@@ -835,10 +845,60 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
                         : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
                     } focus:outline-none focus:ring-2 focus:ring-[#E94E8B]`}
                   >
-                    <option value="american-diamond">American Diamond</option>
-                    <option value="temple-jewellery">Temple Jewellery</option>
-                    <option value="anti-tarnish">Anti tarnish</option>
+                    {PRODUCT_STYLES.map((style) => (
+                      <option key={style.slug} value={style.slug}>
+                        {style.label}
+                      </option>
+                    ))}
                   </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label
+                    className={`block text-sm font-medium mb-2 ${
+                      isDarkTheme ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Collections
+                  </label>
+                  {collectionsList.length === 0 ? (
+                    <p className={`text-sm ${isDarkTheme ? "text-gray-400" : "text-gray-500"}`}>
+                      No active collections available.
+                    </p>
+                  ) : (
+                    <div className="flex flex-row flex-wrap items-center gap-2">
+                      {collectionsList.map((collection) => {
+                        const isSelected = formData.collection_ids.includes(
+                          collection.collection_id,
+                        );
+                        return (
+                          <button
+                            key={collection.collection_id}
+                            type="button"
+                            className={`px-4 py-2 rounded-lg border transition-colors ${
+                              isSelected
+                                ? "bg-[#E94E8B] border-[#E94E8B] text-white"
+                                : isDarkTheme
+                                  ? "bg-gray-800 border-gray-700 text-white hover:bg-gray-700 hover:border-gray-600"
+                                  : "bg-white border-gray-300 text-gray-900 hover:bg-gray-100 hover:border-gray-400"
+                            } focus:outline-none focus:ring-2 focus:ring-[#E94E8B]`}
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                collection_ids: isSelected
+                                  ? prev.collection_ids.filter(
+                                      (id) => id !== collection.collection_id,
+                                    )
+                                  : [...prev.collection_ids, collection.collection_id],
+                              }));
+                            }}
+                          >
+                            {collection.collection_name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
