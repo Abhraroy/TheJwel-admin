@@ -149,6 +149,9 @@ export interface Product {
   size?: string[] | null;
   tags?: string[] | null;
   occasion?: string | null;
+  occasion_id?: UUID | null;
+  style?: string | null;
+  style_id?: UUID | null;
   collection?: string | null;
   listed_status?: boolean | null;
   home_visibility?: boolean | null;

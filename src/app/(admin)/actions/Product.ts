@@ -246,8 +246,8 @@ export async function createProduct(productData: any) {
       thumbnail_image: productData.thumbnail_image, // ✅ URL only
       size: productData.size || [],
       tags: productData.tags || [],
-      occasion: productData.occasion || "",
-      style: productData.style || "",
+      style_id: productData.style_id || null,
+      occasion_id: productData.occasion_id || null,
       listed_status:
         typeof productData.listed_status === "boolean"
           ? productData.listed_status
@@ -345,8 +345,8 @@ export async function updateProduct(productId: string, productData: any) {
       thumbnail_image: productData.thumbnail_image,
       size: productData.size || [],
       tags: productData.tags || [],
-      occasion: productData.occasion || "",
-      style: productData.style || "",
+      style_id: productData.style_id || null,
+      occasion_id: productData.occasion_id || null,
       listed_status:
         typeof productData.listed_status === "boolean"
           ? productData.listed_status

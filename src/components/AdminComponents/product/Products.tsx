@@ -9,7 +9,13 @@ import { useRouter } from "next/navigation";
 import useAdminStore from "../../../zustandStore/AdminZustandStore";
 import OptimizedImage from "@/components/OptimizedImage";
 import { ADMIN_SELECTABLE_TAGS } from "@/lib/product-tags";
-import { PRODUCT_STYLES, normalizeStyle } from "@/lib/product-style";
+import {
+  getActiveStylesForSelect,
+  getActiveOccasionsForSelect,
+  type StyleSelectOption,
+  type OccasionSelectOption,
+} from "@/app/(admin)/actions";
+import { resolveOccasionId, resolveStyleId } from "@/lib/product-style-occasion";
 import {
   getActiveCollectionsForSelect,
   type CollectionSelectOption,
@@ -47,6 +53,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [subCategoriesList, setSubCategoriesList] = useState<any[]>([]);
   const [collectionsList, setCollectionsList] = useState<CollectionSelectOption[]>([]);
+  const [stylesList, setStylesList] = useState<StyleSelectOption[]>([]);
+  const [occasionsList, setOccasionsList] = useState<OccasionSelectOption[]>([]);
 
   // Allow empty string for numeric inputs so placeholder can show (instead of a leading 0).
   type NumericInput = number | "";
@@ -64,8 +72,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
     thumbnail_image: null as File | string | null,
     size: [] as string[],
     tags: [] as string[],
-    occasion: "" as string,
-    style: "american-diamond" as string,
+    occasion_id: "" as string,
+    style_id: "" as string,
     collection_ids: [] as string[],
     listed_status: true as boolean,
     home_visibility: true as boolean,
@@ -98,6 +106,28 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
       }
     };
     fetchCollections();
+  }, []);
+
+  useEffect(() => {
+    const fetchStyleOccasionOptions = async () => {
+      const [stylesResult, occasionsResult] = await Promise.all([
+        getActiveStylesForSelect(),
+        getActiveOccasionsForSelect(),
+      ]);
+
+      if (stylesResult.success && stylesResult.data) {
+        setStylesList(stylesResult.data);
+      } else {
+        console.error("Failed to fetch styles:", stylesResult.error);
+      }
+
+      if (occasionsResult.success && occasionsResult.data) {
+        setOccasionsList(occasionsResult.data);
+      } else {
+        console.error("Failed to fetch occasions:", occasionsResult.error);
+      }
+    };
+    fetchStyleOccasionOptions();
   }, []);
 
   // Initialize form when product prop changes (for editing)
@@ -133,8 +163,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
         thumbnail_image: (editingProduct.thumbnail_image ?? null) as string | null,
         size: safeArray(editingProduct.size),
         tags: safeArray(editingProduct.tags),
-        occasion: safeString(editingProduct.occasion),
-        style: normalizeStyle(editingProduct.style ?? editingProduct.collection),
+        occasion_id: resolveOccasionId(editingProduct, occasionsList),
+        style_id: resolveStyleId(editingProduct, stylesList),
         collection_ids: safeCollectionIds(editingProduct.product_collections),
         listed_status: editingProduct.listed_status ?? true,
         home_visibility: editingProduct.home_visibility ?? true,
@@ -164,15 +194,15 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
         thumbnail_image: null,
         size: [],
         tags: [],
-        occasion: "",
-        style: "american-diamond",
+        occasion_id: "",
+        style_id: stylesList[0]?.style_id ?? "",
         collection_ids: [],
         listed_status: true,
         home_visibility: true,
       });
       setThumbnailImagePreview(null);
     }
-  }, [editingProduct]);
+  }, [editingProduct, stylesList, occasionsList]);
 
   const selectedCategoryName = categoriesList.find(
     (cat) => cat.category_id === formData.category_id
@@ -372,8 +402,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
       thumbnail_image: null,
       size: [],
       tags: [],
-      occasion: "",
-      style: "american-diamond",
+      occasion_id: "",
+      style_id: stylesList[0]?.style_id ?? "",
       collection_ids: [],
       listed_status: true,
       home_visibility: true,
@@ -810,8 +840,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
                     Occasion *
                   </label>
                   <select
-                    name="occasion"
-                    value={formData.occasion}
+                    name="occasion_id"
+                    value={formData.occasion_id}
                     onChange={handleInputChange}
                     className={`w-full px-4 py-2 rounded-lg border transition-colors ${
                       isDarkTheme
@@ -821,9 +851,11 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
                     required
                   >
                     <option value="">Select Occasion</option>
-                    <option value="everydaywear">Everyday Wear</option>
-                    <option value="partywear">Party Wear</option>
-                    <option value="wedding">Wedding</option>
+                    {occasionsList.map((occasion) => (
+                      <option key={occasion.occasion_id} value={occasion.occasion_id}>
+                        {occasion.occasion_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -836,8 +868,8 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
                     Style
                   </label>
                   <select
-                    name="style"
-                    value={formData.style}
+                    name="style_id"
+                    value={formData.style_id}
                     onChange={handleInputChange}
                     className={`w-full px-4 py-2 rounded-lg border transition-colors ${
                       isDarkTheme
@@ -845,9 +877,10 @@ export default function ProductForm({ isDarkTheme, product }: ProductFormProps) 
                         : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
                     } focus:outline-none focus:ring-2 focus:ring-[#E94E8B]`}
                   >
-                    {PRODUCT_STYLES.map((style) => (
-                      <option key={style.slug} value={style.slug}>
-                        {style.label}
+                    <option value="">Select Style</option>
+                    {stylesList.map((style) => (
+                      <option key={style.style_id} value={style.style_id}>
+                        {style.style_name}
                       </option>
                     ))}
                   </select>

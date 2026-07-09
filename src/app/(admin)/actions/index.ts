@@ -17,6 +17,32 @@ export {
   type UpdateCategoryData,
 } from './categories'
 
+// Style actions
+export {
+  getStyles,
+  getActiveStylesForSelect,
+  createStyle,
+  updateStyle,
+  deleteStyle,
+  type Style,
+  type StyleSelectOption,
+  type CreateStyleData,
+  type UpdateStyleData,
+} from './styles'
+
+// Occasion actions
+export {
+  getOccasions,
+  getActiveOccasionsForSelect,
+  createOccasion,
+  updateOccasion,
+  deleteOccasion,
+  type Occasion,
+  type OccasionSelectOption,
+  type CreateOccasionData,
+  type UpdateOccasionData,
+} from './occasions'
+
 // Utility functions
 export { extractR2KeyFromUrl } from './utils'
 

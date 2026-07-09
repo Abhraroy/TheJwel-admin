@@ -150,13 +150,17 @@ create table public.products (
   tags text[] null,
   occasion text null,
   style text null,
+  style_id uuid null,
+  occasion_id uuid null,
   listed_status boolean null default false,
   sku text null,
   home_visibility boolean not null default true,
   constraint products_pkey primary key (product_id),
   constraint products_sku_key unique (sku),
   constraint products_category_id_fkey foreign KEY (category_id) references categories (category_id) on delete set null,
-  constraint products_subcategory_id_fkey foreign KEY (subcategory_id) references sub_categories (subcategory_id) on update CASCADE on delete CASCADE
+  constraint products_subcategory_id_fkey foreign KEY (subcategory_id) references sub_categories (subcategory_id) on update CASCADE on delete CASCADE,
+  constraint products_style_id_fkey foreign KEY (style_id) references styles (style_id) on delete set null,
+  constraint products_occasion_id_fkey foreign KEY (occasion_id) references occasions (occasion_id) on delete set null
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_products_category on public.products using btree (category_id) TABLESPACE pg_default;
@@ -275,3 +279,45 @@ create table public.product_collections (
 create index IF not exists idx_product_collections_product_id on public.product_collections using btree (product_id) TABLESPACE pg_default;
 
 create index IF not exists idx_product_collections_collection_id on public.product_collections using btree (collection_id) TABLESPACE pg_default;
+
+
+
+
+-- ==========================================
+-- Styles Table
+-- ==========================================
+CREATE TABLE public.styles (
+    style_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    style_name TEXT NOT NULL UNIQUE,
+    slug TEXT UNIQUE,
+    image_link TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_styles_active
+ON public.styles(is_active);
+
+CREATE INDEX idx_styles_slug
+ON public.styles(slug);
+
+
+-- ==========================================
+-- Occasions Table
+-- ==========================================
+CREATE TABLE public.occasions (
+    occasion_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    occasion_name TEXT NOT NULL UNIQUE,
+    slug TEXT UNIQUE,
+    image_link TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_occasions_active
+ON public.occasions(is_active);
+
+CREATE INDEX idx_occasions_slug
+ON public.occasions(slug);

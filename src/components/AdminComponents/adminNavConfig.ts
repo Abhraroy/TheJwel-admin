@@ -10,7 +10,9 @@ import {
   ImageUp,
   ChartNoAxesCombined,
   Settings,
-  Group
+  Group,
+  Palette,
+  CalendarHeart,
 } from "lucide-react";
 
 import { FaUsers } from "react-icons/fa";
@@ -60,6 +62,8 @@ export const adminNavItems: NavItem[] = [
         icon: PackageSearch,
       },
       { id: "categories", label: "Categories", href: "/categories", icon: MdOutlineCategory },
+      { id: "styles", label: "Style", href: "/styles", icon: Palette },
+      { id: "occasions", label: "Occasion", href: "/occasions", icon: CalendarHeart },
       { id: "collections", label: "Collections", href: "/collection", icon: Group },
     ],
     icon: Warehouse,
