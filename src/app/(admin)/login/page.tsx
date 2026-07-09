@@ -124,14 +124,14 @@ export default function AdminLoginPage() {
           </div>
 
           {/* Tab toggle */}
-          <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+          <div className="flex rounded-lg border border-gray-900 p-1 bg-gray-50">
             <button
               type="button"
               onClick={() => switchMode('login')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 cursor-pointer py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 mode === 'login'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[#360000] text-white shadow-sm'
+                  : 'text-gray-600 hover:text-[#360000] hover:bg-white'
               }`}
             >
               Login
@@ -139,10 +139,10 @@ export default function AdminLoginPage() {
             <button
               type="button"
               onClick={() => switchMode('create')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 cursor-pointer py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 mode === 'create'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[#360000] text-white shadow-sm'
+                  : 'text-gray-600 hover:text-[#360000] hover:bg-white'
               }`}
             >
               Create Admin
@@ -176,7 +176,7 @@ export default function AdminLoginPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder-gray-400"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder-gray-400"
                 placeholder="Enter your email"
               />
             </div>
@@ -195,7 +195,7 @@ export default function AdminLoginPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder-gray-400"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder-gray-400"
                 placeholder="Enter your password"
               />
             </div>
@@ -214,7 +214,7 @@ export default function AdminLoginPage() {
                 value={formData.key}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder-gray-400"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder-gray-400"
                 placeholder={mode === 'login' ? 'Enter admin key' : 'Enter admin key (required for creation)'}
               />
             </div>
@@ -222,7 +222,7 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center"
+              className="w-full bg-[#360000] hover:bg-[#360000]/80 disabled:bg-[#360000]/40 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 flex items-center justify-center"
             >
               {isLoading ? (
                 <>

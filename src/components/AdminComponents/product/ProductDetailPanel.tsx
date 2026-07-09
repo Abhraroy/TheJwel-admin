@@ -14,7 +14,13 @@ import {
 } from "@/app/(admin)/actions/Product";
 import { getCategories, getSubCategories } from "@/app/(admin)/actions/categories";
 import { ADMIN_SELECTABLE_TAGS } from "@/lib/product-tags";
-import { PRODUCT_STYLES, normalizeStyle } from "@/lib/product-style";
+import {
+  getActiveStylesForSelect,
+  getActiveOccasionsForSelect,
+  type StyleSelectOption,
+  type OccasionSelectOption,
+} from "@/app/(admin)/actions";
+import { resolveOccasionId, resolveStyleId } from "@/lib/product-style-occasion";
 import {
   getActiveCollectionsForSelect,
   type CollectionSelectOption,
@@ -39,8 +45,8 @@ type FormData = {
   weight_grams: string;
   size: string[];
   tags: string[];
-  occasion: string;
-  style: string;
+  occasion_id: string;
+  style_id: string;
   collection_ids: string[];
   listed_status: boolean;
   home_visibility: boolean;
@@ -71,7 +77,11 @@ function getThumbnailUrl(product: any): string | null {
     : null;
 }
 
-function buildFormFromProduct(product: any): FormData {
+function buildFormFromProduct(
+  product: any,
+  styles: StyleSelectOption[] = [],
+  occasions: OccasionSelectOption[] = [],
+): FormData {
   const basePrice = Number(product.base_price ?? 0);
   const finalPrice = Number(product.final_price ?? 0);
   return {
@@ -89,8 +99,8 @@ function buildFormFromProduct(product: any): FormData {
     weight_grams: String(product.weight_grams ?? ""),
     size: safeArray(product.size),
     tags: safeArray(product.tags),
-    occasion: product.occasion ?? "",
-    style: normalizeStyle(product.style ?? product.collection),
+    occasion_id: resolveOccasionId(product, occasions),
+    style_id: resolveStyleId(product, styles),
     collection_ids: getProductCollectionIds(product),
     listed_status: product.listed_status ?? true,
     home_visibility: product.home_visibility ?? true,
@@ -136,8 +146,8 @@ function formsEqual(a: FormData, b: FormData): boolean {
     a.discount_percentage === b.discount_percentage &&
     a.stock_quantity === b.stock_quantity &&
     a.weight_grams === b.weight_grams &&
-    a.occasion === b.occasion &&
-    a.style === b.style &&
+    a.occasion_id === b.occasion_id &&
+    a.style_id === b.style_id &&
     a.listed_status === b.listed_status &&
     a.home_visibility === b.home_visibility &&
     JSON.stringify(a.size) === JSON.stringify(b.size) &&
@@ -164,8 +174,8 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
     weight_grams: "",
     size: [],
     tags: [],
-    occasion: "",
-    style: "american-diamond",
+    occasion_id: "",
+    style_id: "",
     collection_ids: [],
     listed_status: true,
     home_visibility: true,
@@ -173,6 +183,8 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [subCategoriesList, setSubCategoriesList] = useState<any[]>([]);
   const [collectionsList, setCollectionsList] = useState<CollectionSelectOption[]>([]);
+  const [stylesList, setStylesList] = useState<StyleSelectOption[]>([]);
+  const [occasionsList, setOccasionsList] = useState<OccasionSelectOption[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -223,16 +235,34 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
     fetchCollections();
   }, []);
 
+  useEffect(() => {
+    const fetchStyleOccasionOptions = async () => {
+      const [stylesResult, occasionsResult] = await Promise.all([
+        getActiveStylesForSelect(),
+        getActiveOccasionsForSelect(),
+      ]);
+
+      if (stylesResult.success && stylesResult.data) {
+        setStylesList(stylesResult.data);
+      }
+
+      if (occasionsResult.success && occasionsResult.data) {
+        setOccasionsList(occasionsResult.data);
+      }
+    };
+    fetchStyleOccasionOptions();
+  }, []);
+
   const resetForm = useCallback(
     (product: any) => {
-      setFormData(buildFormFromProduct(product));
+      setFormData(buildFormFromProduct(product, stylesList, occasionsList));
       if (product.category_id) {
         fetchSubCategories(product.category_id);
       } else {
         setSubCategoriesList([]);
       }
     },
-    [fetchSubCategories]
+    [fetchSubCategories, stylesList, occasionsList]
   );
 
   useEffect(() => {
@@ -244,9 +274,9 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
 
   const isDirty = useMemo(() => {
     if (!selectedProduct) return false;
-    const original = buildFormFromProduct(selectedProduct);
+    const original = buildFormFromProduct(selectedProduct, stylesList, occasionsList);
     return !formsEqual(formData, original);
-  }, [formData, selectedProduct]);
+  }, [formData, selectedProduct, stylesList, occasionsList]);
 
   const selectedCategoryName = categoriesList.find(
     (cat) => cat.category_id === formData.category_id
@@ -307,8 +337,8 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
     weight_grams: Number(formData.weight_grams) || 0,
     size: formData.size,
     tags: formData.tags,
-    occasion: formData.occasion,
-    style: formData.style,
+    occasion_id: formData.occasion_id || null,
+    style_id: formData.style_id || null,
     collection_ids: formData.collection_ids,
     listed_status: formData.listed_status,
     home_visibility: formData.home_visibility,
@@ -904,30 +934,33 @@ export default function ProductDetailPanel({ products }: ProductDetailPanelProps
               <div>
                 <label className={labelClass}>Occasion</label>
                 <select
-                  value={formData.occasion}
+                  value={formData.occasion_id}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, occasion: e.target.value }))
+                    setFormData((prev) => ({ ...prev, occasion_id: e.target.value }))
                   }
                   className={inputClass}
                 >
                   <option value="">Select occasion</option>
-                  <option value="everydaywear">Everyday Wear</option>
-                  <option value="partywear">Party Wear</option>
-                  <option value="wedding">Wedding</option>
+                  {occasionsList.map((occasion) => (
+                    <option key={occasion.occasion_id} value={occasion.occasion_id}>
+                      {occasion.occasion_name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Style</label>
                 <select
-                  value={formData.style}
+                  value={formData.style_id}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, style: e.target.value }))
+                    setFormData((prev) => ({ ...prev, style_id: e.target.value }))
                   }
                   className={inputClass}
                 >
-                  {PRODUCT_STYLES.map((style) => (
-                    <option key={style.slug} value={style.slug}>
-                      {style.label}
+                  <option value="">Select style</option>
+                  {stylesList.map((style) => (
+                    <option key={style.style_id} value={style.style_id}>
+                      {style.style_name}
                     </option>
                   ))}
                 </select>
